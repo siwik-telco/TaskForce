@@ -89,7 +89,7 @@ class SecureProcessBlocker:
         print("Process monitor stopped")
     
     def _should_terminate_process(self, process):
-        """Sprawdza czy proces powinien być zabity"""
+        
         try:
             proc_info = process.info
             proc_name = proc_info['name'].lower()
