@@ -1,69 +1,80 @@
-# -*- coding: utf-8 -*-
-"""
-Mini-widget (PyQt5) przypięty w **lewym górnym rogu** pulpitu Windows.
-Pokazuje odliczanie i przycisk „Cheat”.
-
-• Brak logiki blokowania – sam front-end.
-• Zawsze na wierzchu, bez ramki, nie pojawia się na pasku zadań.
-"""
-
 import sys
-from PyQt5.QtCore import Qt, QTimer, QTime
+from PyQt5.QtCore import Qt, QTimer, QTime, QPropertyAnimation, QEasingCurve
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QPushButton,
-    QVBoxLayout, QMessageBox
+    QVBoxLayout, QHBoxLayout, QMessageBox   
 )
 
 
-class DesktopCountdown(QWidget):
+
+class SlidingCountdown(QWidget):
+    HANDLE_W = 26           
+    MARGIN   = 6            
+
     def __init__(self, seconds_left=3600):
         super().__init__()
         self.seconds_left = seconds_left
-        self.cheat_used = False
+        self.cheat_used   = False
+        self.is_visible   = False   
+        self.anim         = None
 
         self._build_ui()
         self._start_timer()
 
-    # ---------- UI ----------
+    
     def _build_ui(self):
         self.setFixedSize(200, 110)
-        self.setWindowTitle("TaskForce")
         self.setWindowFlags(
-            Qt.FramelessWindowHint      |  # bez ramki
-            Qt.WindowStaysOnTopHint     |  # zawsze na wierzchu
-            Qt.Tool                     |  # brak na pasku zadań
-            Qt.X11BypassWindowManagerHint   # minimalne dekoracje
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
         )
         self.setAttribute(Qt.WA_TranslucentBackground, True)
 
-        # Odliczanie
+        
         self.time_lbl = QLabel(self._fmt(self.seconds_left))
         self.time_lbl.setAlignment(Qt.AlignCenter)
-        self.time_lbl.setStyleSheet("font: 700 24px 'Segoe UI'; color:#FFFFFF;")
+        self.time_lbl.setStyleSheet("font:700 24px 'Segoe UI'; color:#fff;")
 
-        # Cheat
-        cheat_btn = QPushButton("Cheat\n1 raz / tydzień")
+        
+        cheat_btn = QPushButton("Cheat\nonce a / week")
         cheat_btn.clicked.connect(self._cheat)
         cheat_btn.setStyleSheet(
-            "QPushButton{background:#ffaa00;font-weight:600;border:none;border-radius:6px;}"
-            "QPushButton:pressed{background:#ff8800;}"
-        )
+            "QPushButton{background:#ffaa00;font-weight:600;border:none;"
+            "border-radius:6px;}QPushButton:pressed{background:#ff8800;}")
 
-        # Layout
-        vbox = QVBoxLayout(self)
-        vbox.addWidget(self.time_lbl, alignment=Qt.AlignCenter)
-        vbox.addWidget(cheat_btn, alignment=Qt.AlignCenter)
-        vbox.setContentsMargins(8, 8, 8, 8)
+       
+        self.handle_btn = QPushButton("▶")
+        self.handle_btn.setFixedWidth(self.HANDLE_W)
+        self.handle_btn.clicked.connect(self._toggle_slide)
+        self.handle_btn.setStyleSheet(
+            "QPushButton{background:#333;color:#fff;border:none;font:700 16px;}"
+            "QPushButton:hover{background:#555;}")
 
-        # Tło z lekkim gradientem
-        self.setStyleSheet("""
+       
+        panel_layout = QVBoxLayout()
+        panel_layout.addWidget(self.time_lbl, alignment=Qt.AlignCenter)
+        panel_layout.addWidget(cheat_btn, alignment=Qt.AlignCenter)
+        panel_layout.setContentsMargins(8, 8, 0, 8)
+
+        main = QWidget()
+        main.setLayout(panel_layout)
+        main.setStyleSheet("""
             QWidget{
                 background:qlineargradient(x1:0,y1:0,x2:0,y2:1,
-                                            stop:0 #3b3b3b, stop:1 #1e1e1e);
-                border:2px solid #000; border-radius:12px;
+                                           stop:0 #3b3b3b, stop:1 #1e1e1e);
+                border:2px solid #000; border-top-left-radius:12px;
+                border-bottom-left-radius:12px;
             }""")
 
-    # ---------- Timer ----------
+     
+        wrapper = QVBoxLayout(self)
+        wrapper.setContentsMargins(0, 0, 0, 0)
+        row = QHBoxLayout()
+        row.setSpacing(0)
+        row.addWidget(main)
+        row.addWidget(self.handle_btn)
+        wrapper.addLayout(row)
+
+  
     def _start_timer(self):
         self.timer = QTimer(self)
         self.timer.timeout.connect(self._tick)
@@ -77,33 +88,50 @@ class DesktopCountdown(QWidget):
         self.seconds_left -= 1
         self.time_lbl.setText(self._fmt(self.seconds_left))
 
-    # ---------- Cheat ----------
     def _cheat(self):
         if self.cheat_used:
             QMessageBox.information(self, "Cheat",
-                                    "Cheat już wykorzystany w tym tygodniu!")
+                                    "Cheat has been used this week!")
             return
-        # tu podłącz odblokowanie
-        QMessageBox.information(self, "Cheat", "Cheat aktywowany!")
+        QMessageBox.information(self, "Cheat", "Cheat activated!")
         self.cheat_used = True
 
-    # ---------- Pozycjonowanie ----------
-    def showEvent(self, event):
-        super().showEvent(event)
-        # Lewy górny róg dostępnej przestrzeni ekranu[75]
-        screen_geo = QApplication.primaryScreen().availableGeometry()
-        margin = 6
-        self.move(screen_geo.left() + margin, screen_geo.top() + margin)
+    
+    def _toggle_slide(self):
+        scr   = QApplication.primaryScreen().availableGeometry()
+        full  = self.frameGeometry()
+        shown_x  = scr.left() + self.MARGIN
+        hidden_x = shown_x - (full.width() - self.HANDLE_W)
 
-    # ---------- Util ----------
+        end_x = shown_x if not self.is_visible else hidden_x
+        self.is_visible = not self.is_visible
+
+        
+        self.handle_btn.setText("◀" if self.is_visible else "▶")
+
+        
+        self.anim = QPropertyAnimation(self, b"pos", self)
+        self.anim.setDuration(250)
+        self.anim.setEasingCurve(QEasingCurve.OutCubic)
+        self.anim.setEndValue(QPoint(end_x, scr.top() + self.MARGIN))
+        self.anim.start()
+
+    
+    def showEvent(self, ev):
+        scr = QApplication.primaryScreen().availableGeometry()
+        hidden_x = scr.left() + self.MARGIN - (self.width() - self.HANDLE_W)
+        self.move(hidden_x, scr.top() + self.MARGIN)
+        super().showEvent(ev)
+
+    
     @staticmethod
     def _fmt(sec):
         return QTime(0, 0).addSecs(sec).toString("hh:mm:ss")
 
 
-# ----------------- demo -----------------
 if __name__ == "__main__":
+    from PyQt5.QtCore import QPoint  
     app = QApplication(sys.argv)
-    w = DesktopCountdown(seconds_left=5400)     # 90 minut demo
+    w = SlidingCountdown(seconds_left=5400) 
     w.show()
     sys.exit(app.exec_())
