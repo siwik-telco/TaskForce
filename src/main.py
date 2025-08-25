@@ -41,7 +41,7 @@ class TaskForceController:
 
 
 
-    def _connect_main_gui_buttons():
+    def _connect_main_gui_buttons(self):
         
         start_btn = None
         stop_btn = None
@@ -85,8 +85,8 @@ class TaskForceController:
             quit_action = tray_menu.addAction("Quit")        
             quit_action.triggered.connect(self.quit_application)
             self.tray_icon.show()
-    
-    
+   # @todo set name and icon 
+
        
     
        
