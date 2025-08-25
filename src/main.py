@@ -36,6 +36,13 @@ class TaskForceController:
         self.session_timer.timeout.connect(self._show_break_notification)
     
     def _create_gui(self):
+        self.main_gui = TaskForceWidget()
+        self._connect_main_gui_buttons()
+
+
+
+    def _connect_main_gui_buttons():
+        
         start_btn = None
         stop_btn = None
         plan_btn = None
@@ -52,4 +59,34 @@ class TaskForceController:
                             stop_btn == widget
                         elif widget.text() == "Plan in advance":
                             plan_btn = widget
-        @TODO: connecting signals aaa
+        if start_btn:
+            start_btn.clicked.disconnect()
+            start_btn.clicked.connect(self.start_focus_session)
+
+        if stop_btn:
+            stop_btn.clicked.connect(self.stop_focus_session)
+
+        if plan_btn:
+            plan_btn.clicked.connect(self.schedule_session)
+
+    def _setup_tray_icon(self):
+        if QSystemTrayIcon.isSystemTrayAvailable():
+            self.tray_icon = QSystemTrayIcon()
+
+            tray_menu = QMenu()
+            show_action = tray_menu.addAction("Show main window")
+            show_action.triggered.connect(self.show_main_window)
+
+            stop_action = tray_menu.addAction("Stop session!")
+            stop_action.triggered.connect(self.stop_focus_session)
+
+            tray_menu.addSeparator()
+
+            quit_action = tray_menu.addAction("Quit")        
+            quit_action.triggered.connect(self.quit_application)
+            self.tray_icon.show()
+    
+    
+       
+    
+       
